@@ -1,0 +1,50 @@
+name: Build FluidNC Firmware (ESP32 All Binaries)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build for all boards
+
+    steps:
+      # 1️⃣ Checkout kode repo
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Python (dibutuhkan oleh PlatformIO)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 3️⃣ Install PlatformIO
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      # 4️⃣ Build semua environment di platformio.ini
+      - name: Build all firmware
+        run: pio run
+
+      # 5️⃣ (Opsional) Build LittleFS filesystem jika digunakan
+      - name: Build LittleFS filesystem
+        run: pio run -t buildfs
+        continue-on-error: true  # agar workflow tidak gagal kalau tidak ada filesystem
+
+      # 6️⃣ Kumpulkan semua file hasil build
+      - name: List built files
+        run: ls -R .pio/build
+
+      # 7️⃣ Upload semua file .bin ke GitHub Artifacts
+      - name: Upload all binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: fluidnc-binaries
+          path: |
+            .pio/build/*/firmware.bin
+            .pio/build/*/bootloader.bin
+            .pio/build/*/partitions.bin
+            .pio/build/*/littlefs.bin
