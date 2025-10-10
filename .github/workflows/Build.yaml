@@ -1,15 +1,29 @@
-name: Build FluidNC
-on: [push, pull_request]
+name: Build FluidNC Firmware
+
+on:
+  push:
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
-      - name: Setup PlatformIO
+
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
+
       - name: Install PlatformIO
         run: pip install platformio
+
       - name: Build firmware
         run: pio run
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: .pio/build/*/firmware.bin
