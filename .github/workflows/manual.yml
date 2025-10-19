@@ -52,12 +52,12 @@ jobs:
     - name: Deploy to fluidnc-releases
       uses: datalbry/copy_folder_to_another_repo_action@1.0.0
       env:
-        API_TOKEN_GITHUB: ${{ secrets.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 }}
+        API_TOKEN_GITHUB: ${{ secrets.RELEASE_COPY_TOKEN }}
       with:
         source_folder: 'release/current'
         destination_repo: 'Asemproject/fluidnc-releases'
         destination_branch: 'main'
-        destination_folder: releases/${{ github.ref_name }}
+        destination_folder: releases/${{ github.event.inputs.tag }}
+        commit_msg: Release ${{ github.event.inputs.tag }}
         user_email: asemarema4@gmail.com
         user_name: 'asem'
-        commit_msg: Release ${{ github.ref_name }}
