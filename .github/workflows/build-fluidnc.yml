@@ -4,14 +4,7 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'        # otomatis bikin release kalau ada tag versi
-  pull_request:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release version (e.g. v3.7.15)'
-        required: false
 
 jobs:
   build:
@@ -20,58 +13,51 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # Cache pip
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
-    # Cache PlatformIO
-    - name: Cache PlatformIO
-      uses: actions/cache@v4
-      with:
-        path: ~/.platformio
-        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
-
-    # Setup Python
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
-    # Install PlatformIO
     - name: Install PlatformIO
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade platformio
 
-    # Build semua environment ESP32 (tanpa S3 dulu, karena error)
+    # Build semua env (tanpa S3 dulu)
     - name: Build all firmware
       run: pio run -e wifi -e bt -e noradio
 
-    # Build LittleFS (opsional)
     - name: Build LittleFS filesystem
       run: pio run -t buildfs -e wifi -e bt -e noradio
       continue-on-error: true
 
-    # List hasil build
     - name: List build outputs
       run: ls -lh .pio/build/*/
 
-    # Upload ke Release kalau ada tag
-    - name: Upload binaries to Release
-      if: startsWith(github.ref, 'refs/tags/')
+    # 🔹 Kumpulkan semua .bin ke dalam satu ZIP
+    - name: Package BIN files
+      run: |
+        mkdir -p release
+        zip -j release/fluidnc-binaries.zip .pio/build/*/*.bin
+
+    # 🔹 Copy file lain (misalnya ELF, MAP) ke folder release
+    - name: Collect other artifacts
+      run: |
+        cp .pio/build/*/*.elf release/ || true
+        cp .pio/build/*/*.map release/ || true
+
+    # 🔹 Upload ke Release
+    - name: Upload to Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
+        tag_name: latest
+        name: Latest Build
         draft: false
         prerelease: false
         overwrite: true
         files: |
-          .pio/build/*/*.bin
+          release/fluidnc-binaries.zip
+          release/*.elf
+          release/*.map
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
