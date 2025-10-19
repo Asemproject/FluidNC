@@ -53,7 +53,7 @@ jobs:
         API_TOKEN_GITHUB: ${{ secrets.RELEASE_COPY_TOKEN }}
       with:
         source_folder: 'release/current'
-        destination_repo: 'bdring/fluidnc-releases'
+        destination_repo: 'Asemprohect/fluidnc-releases'
         destination_branch: 'main'
         destination_folder: releases/${{ github.event.inputs.tag }}
         user_email: bdring@buildlog.net
