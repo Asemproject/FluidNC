@@ -9,28 +9,37 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    name: Build all FluidNC environments
+
     steps:
+      # 1️⃣ Checkout kode
       - name: Checkout source
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
+      # 3️⃣ Install PlatformIO
       - name: Install PlatformIO
         run: pip install platformio
 
+      # 4️⃣ Build semua environment di platformio.ini
       - name: Build all firmware
-        run: pio run
+        run: pio run -e wifi -e bt -e noradio -e wifi_s3 -e bt_s3 -e noradio_s3
 
+      # 5️⃣ Build LittleFS (opsional)
       - name: Build LittleFS filesystem
-        run: pio run -t buildfs
+        run: pio run -t buildfs -e wifi -e bt -e noradio -e wifi_s3 -e bt_s3 -e noradio_s3
         continue-on-error: true
 
-      - name: List built files
-        run: ls -R .pio/build
+      # 6️⃣ List hasil build
+      - name: List build outputs
+        run: ls -lh .pio/build/*/
 
+      # 7️⃣ Upload semua .bin ke Release "Latest"
       - name: Upload binaries to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -39,9 +48,6 @@ jobs:
           draft: false
           prerelease: true
           files: |
-            .pio/build/*/firmware*.bin
-            .pio/build/*/bootloader*.bin
-            .pio/build/*/partitions*.bin
-            .pio/build/*/littlefs*.bin
+            .pio/build/*/*.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
