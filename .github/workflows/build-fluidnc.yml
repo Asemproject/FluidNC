@@ -2,7 +2,8 @@ name: Build FluidNC Firmware (ESP32 All Binaries)
 
 on:
   push:
-  pull_request:
+    tags:
+      - 'v*'   # hanya jalan kalau push tag versi, misalnya v3.7.15
   workflow_dispatch:
 
 jobs:
@@ -32,19 +33,20 @@ jobs:
       # 5️⃣ (Opsional) Build LittleFS filesystem jika digunakan
       - name: Build LittleFS filesystem
         run: pio run -t buildfs
-        continue-on-error: true  # agar workflow tidak gagal kalau tidak ada filesystem
+        continue-on-error: true
 
       # 6️⃣ Kumpulkan semua file hasil build
       - name: List built files
         run: ls -R .pio/build
 
-      # 7️⃣ Upload semua file .bin ke GitHub Artifacts
-      - name: Upload all binaries
-        uses: actions/upload-artifact@v4
+      # 7️⃣ Upload ke Release
+      - name: Upload binaries to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: fluidnc-binaries
-          path: |
+          files: |
             .pio/build/*/firmware.bin
             .pio/build/*/bootloader.bin
             .pio/build/*/partitions.bin
             .pio/build/*/littlefs.bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
