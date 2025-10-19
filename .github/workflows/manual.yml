@@ -1,52 +1,71 @@
-name: FluidNC Release Builder
+name: FluidNC Versioned Release + Copy
 
 on:
+  push:
+    tags:
+      - 'v*'   # contoh: v1.0.0, v1.2.3, dst.
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release version'
-        required: true
 
 jobs:
-  build:
-
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    - name: Cache PlatformIO
-      uses: actions/cache@v4
-      with:
-        path: ~/.platformio
-        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+    - name: Checkout source
+      uses: actions/checkout@v4
+
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
     - name: Install PlatformIO
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade platformio
-    - name: Set release version
+
+    # Build semua environment ESP32 klasik
+    - name: Build ESP32 environments
       run: |
-        git config user.email "wmb@firmworks.com"
-        git config user.name "Mitch Bradley"
-        git tag "${{ github.event.inputs.tag }}" -a -m "Release test"
-    - name: Build
-      run: python build-release.py
-    - name: Create release
-      uses: softprops/action-gh-release@v1
+        pio run -e wifi -e bt -e noradio
+
+    - name: Build LittleFS (optional)
+      run: |
+        pio run -t buildfs -e wifi -e bt -e noradio
+      continue-on-error: true
+
+    - name: List outputs
+      run: ls -lh .pio/build/*/
+
+    # 🔹 Package semua .bin ke dalam satu ZIP (folder env ikut masuk)
+    - name: Package BIN files
+      run: |
+        mkdir -p release/current
+        zip -9 -r release/current/fluidnc-binaries-${{ github.ref_name }}.zip .pio/build/*/*.bin
+
+    # 🔹 Copy file lain (ELF, MAP) ke folder release
+    - name: Collect other artifacts
+      run: |
+        cp .pio/build/*/*.elf release/current/ 2>/dev/null || true
+        cp .pio/build/*/*.map release/current/ 2>/dev/null || true
+
+    # 🔹 Upload ke Release sesuai tag
+    - name: Upload to GitHub Release
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ github.event.inputs.tag }}
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        overwrite: true
         files: |
-          release/*.zip
-          release/*.elf
-        draft: True
+          release/current/fluidnc-binaries-${{ github.ref_name }}.zip
+          release/current/*.elf
+          release/current/*.map
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # 🔹 Copy hasil build ke repo lain (fluidnc-releases)
     - name: Deploy to fluidnc-releases
       uses: datalbry/copy_folder_to_another_repo_action@1.0.0
       env:
@@ -55,22 +74,7 @@ jobs:
         source_folder: 'release/current'
         destination_repo: 'Asemproject/fluidnc-releases'
         destination_branch: 'main'
-        destination_folder: releases/${{ github.event.inputs.tag }}
-        user_email: 'asemarema4@gmail.com'
+        destination_folder: releases/${{ github.ref_name }}
+        user_email: asemarema4@gmail.com
         user_name: 'asem'
-        commit_msg: Release ${{ github.event.inputs.tag }}
-    # - name: Upload mac bundle
-    #   uses: actions/upload-artifact@v2
-    #   with:
-    #     name: release-macos
-    #     path: release/*macos*
-    # - name: Upload Windows bundle
-    #   uses: actions/upload-artifact@v2
-    #   with:
-    #     name: release-win32
-    #     path: release/*win*
-    # - name: Upload Linux bundle
-    #   uses: actions/upload-artifact@v2
-    #   with:
-    #     name: release-linux
-    #     path: release/*linux*
+        commit_msg: Release ${{ github.ref_name }}
