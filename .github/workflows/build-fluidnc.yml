@@ -28,11 +28,11 @@ jobs:
 
       # 4️⃣ Build semua environment di platformio.ini
       - name: Build all firmware
-        run: pio run -e wifi -e bt -e noradio -e wifi_s3 -e bt_s3 -e noradio_s3
+        run: pio run -e wifi -e bt -e noradio 
 
       # 5️⃣ Build LittleFS (opsional)
       - name: Build LittleFS filesystem
-        run: pio run -t buildfs -e wifi -e bt -e noradio -e wifi_s3 -e bt_s3 -e noradio_s3
+        run: pio run -t buildfs -e wifi -e bt -e noradio 
         continue-on-error: true
 
       # 6️⃣ List hasil build
