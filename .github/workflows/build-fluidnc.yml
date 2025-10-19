@@ -1,17 +1,22 @@
-name: FluidNC Release Builder
+name: FluidNC Versioned Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'   # contoh: v1.0.0, v1.2.3, dst.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release version (e.g. v1.0.0)'
+        required: false
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout source
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -23,40 +28,42 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade platformio
 
-    # Build semua env (tanpa S3 dulu)
-    - name: Build all firmware
-      run: pio run -e wifi -e bt -e noradio
+    # Build semua environment ESP32 klasik (exclude S3 karena error i2s)
+    - name: Build ESP32 environments
+      run: |
+        pio run -e wifi -e bt -e noradio
 
-    - name: Build LittleFS filesystem
-      run: pio run -t buildfs -e wifi -e bt -e noradio
+    - name: Build LittleFS (optional)
+      run: |
+        pio run -t buildfs -e wifi -e bt -e noradio
       continue-on-error: true
 
-    - name: List build outputs
+    - name: List outputs
       run: ls -lh .pio/build/*/
 
-    # 🔹 Kumpulkan semua .bin ke dalam satu ZIP
+    # 🔹 Package semua .bin ke dalam satu ZIP (folder env ikut masuk)
     - name: Package BIN files
       run: |
         mkdir -p release
-        zip -j release/fluidnc-binaries.zip .pio/build/*/*.bin
+        zip -9 -r release/fluidnc-binaries-${{ github.ref_name }}.zip .pio/build/*/*.bin
 
-    # 🔹 Copy file lain (misalnya ELF, MAP) ke folder release
+    # 🔹 Copy file lain (ELF, MAP) ke folder release
     - name: Collect other artifacts
       run: |
-        cp .pio/build/*/*.elf release/ || true
-        cp .pio/build/*/*.map release/ || true
+        cp .pio/build/*/*.elf release/ 2>/dev/null || true
+        cp .pio/build/*/*.map release/ 2>/dev/null || true
 
-    # 🔹 Upload ke Release
-    - name: Upload to Release
+    # 🔹 Upload ke Release sesuai tag
+    - name: Upload to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: latest
-        name: Latest Build
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
         draft: false
         prerelease: false
         overwrite: true
         files: |
-          release/fluidnc-binaries.zip
+          release/fluidnc-binaries-${{ github.ref_name }}.zip
           release/*.elf
           release/*.map
       env:
